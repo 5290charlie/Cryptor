@@ -1,0 +1,260 @@
+#!/usr/bin/php
+<?php
+
+define('ASCII_MIN', 32);
+define('ASCII_MAX', 255);
+define('BASE64_MIN', 47);
+define('BASE64_MAX', 122);
+define('CHUNK_SIZE', 4 * (1024 * 1024));
+
+/**
+ * Cryptor
+ */
+class Cryptor {
+	private $arrActions = [
+		'e' => 'encrypt',
+		'd' => 'decrypt'
+	];
+
+	private $strScriptName = __FILE__;
+	private $strAction = '';
+	private $strInputFile = '';
+	private $strOutputFile = '';
+
+	public function __construct($arrArgs) {
+		$this->strScriptName = $arrArgs[0];
+		$this->strAction = trim(strtolower($arrArgs[1]));
+		$this->strInputFile = $arrArgs[2];
+
+		if (isset($arrArgs[3])) {
+			$this->strOutputFile = $arrArgs[3];
+		}
+
+		if ($this->validate()) {
+			if (file_put_contents($this->strOutputFile, $this->run())) {
+				$this->msg("\nFinished.");
+			} else {
+				$this->msg("Failed writing to file: '{$this->strOutputFile}'!");
+			}
+		} else {
+			$this->usage();
+			die();
+		}
+	}
+
+	private function run() {
+		$strFileContents = file_get_contents($this->strInputFile);
+		$strOutput = '';
+		$strKey = md5($this->readString('Enter key: '));
+		$intAltMin = BASE64_MIN - ASCII_MIN;
+		$intAltMax = ASCII_MAX - (BASE64_MAX - ASCII_MIN);
+
+		switch ($this->strAction) {
+			case 'encrypt':
+				$arrFileContents = str_split(base64_encode($strFileContents));
+				$intTotalContents = count($arrFileContents);
+
+				foreach ($arrFileContents as $intIndex => $strChar) {
+					$intChar = ord($strChar);
+					$intChar -= $intAltMin;
+
+					foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+						$intKeyChar = ord($strKeyChar);
+						$intMod = $intKeyChar % $intAltMax;
+						$intChar += $intMod;
+						$intChar -= ($intKeyIndex % $intMod);
+
+						if ($intKeyIndex % 2 == 0) {
+							$intChar -= ($intIndex % $intMod);
+						} else {
+							$intChar += ($intIndex % $intMod);
+						}
+					}
+
+					$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
+					$this->msg("Encrypting [$intPercent%]", true);
+
+					$strOutput .= chr($intChar);
+				}
+				break;
+			case 'decrypt':
+				$arrFileContents = str_split($strFileContents);
+				$intTotalContents = count($arrFileContents);
+
+				foreach ($arrFileContents as $intIndex => $strChar) {
+					$intChar = ord($strChar);
+					$intChar += $intAltMin;
+
+					foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+						$intKeyChar = ord($strKeyChar);
+						$intMod = $intKeyChar % $intAltMax;
+						$intChar -= $intMod;
+						$intChar += ($intKeyIndex % $intMod);
+
+						if ($intKeyIndex % 2 == 0) {
+							$intChar += ($intIndex % $intMod);
+						} else {
+							$intChar -= ($intIndex % $intMod);
+						}
+					}
+
+					$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
+					$this->msg("Decrypting [$intPercent%]", true);
+
+					$strOutput .= chr($intChar);
+				}
+
+				$strOutput = base64_decode($strOutput);
+				break;
+		}
+
+		return $strOutput;
+	}
+
+	// private function run() {
+	// 	$strFileContents = file_get_contents($this->strInputFile);
+	// 	$strOutput = '';
+	// 	$strKey = md5($this->readString('Enter key: '));
+	// 	$intAltMin = BASE64_MIN - ASCII_MIN;
+	// 	$intAltMax = ASCII_MAX - (BASE64_MAX - ASCII_MIN);
+	//
+	// 	switch ($this->strAction) {
+	// 		case 'encrypt':
+	// 			$arrFileContents = str_split(base64_encode($strFileContents));
+	// 			$intTotalContents = count($arrFileContents);
+	//
+	// 			foreach ($arrFileContents as $intIndex => $strChar) {
+	// 				$intChar = ord($strChar);
+	// 				$intChar -= $intAltMin;
+	//
+	// 				foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+	// 					$intKeyChar = ord($strKeyChar);
+	// 					$intMod = $intKeyChar % $intAltMax;
+	// 					$intChar += $intMod;
+	// 					$intChar -= ($intKeyIndex % $intMod);
+	//
+	// 					if ($intKeyIndex % 2 == 0) {
+	// 						$intChar -= ($intIndex % $intMod);
+	// 					} else {
+	// 						$intChar += ($intIndex % $intMod);
+	// 					}
+	// 				}
+	//
+	// 				$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
+	// 				$this->msg("Encrypting [$intPercent%]", true);
+	//
+	// 				$strOutput .= chr($intChar);
+	// 			}
+	// 			break;
+	// 		case 'decrypt':
+	// 			$arrFileContents = str_split($strFileContents);
+	// 			$intTotalContents = count($arrFileContents);
+	//
+	// 			foreach ($arrFileContents as $intIndex => $strChar) {
+	// 				$intChar = ord($strChar);
+	// 				$intChar += $intAltMin;
+	//
+	// 				foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+	// 					$intKeyChar = ord($strKeyChar);
+	// 					$intMod = $intKeyChar % $intAltMax;
+	// 					$intChar -= $intMod;
+	// 					$intChar += ($intKeyIndex % $intMod);
+	//
+	// 					if ($intKeyIndex % 2 == 0) {
+	// 						$intChar += ($intIndex % $intMod);
+	// 					} else {
+	// 						$intChar -= ($intIndex % $intMod);
+	// 					}
+	// 				}
+	//
+	// 				$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
+	// 				$this->msg("Decrypting [$intPercent%]", true);
+	//
+	// 				$strOutput .= chr($intChar);
+	// 			}
+	//
+	// 			$strOutput = base64_decode($strOutput);
+	// 			break;
+	// 	}
+	//
+	// 	return $strOutput;
+	// }
+
+	private function getKeyVal($strKey) {
+		$intKey = 0;
+		$arrKey = str_split($strKey);
+
+		foreach ($arrKey as $intIndex => $strKeyChar) {
+			$intKey += ord($strKeyChar);
+		}
+
+		return $intKey;
+	}
+
+	private function validate() {
+		$blnValid = true;
+
+		if (isset($this->arrActions[$this->strAction])) {
+			$this->strAction = $this->arrActions[$this->strAction];
+		}
+
+		if (!in_array($this->strAction, $this->arrActions)) {
+			$this->msg("Invalid <action>: '{$this->strAction}'!");
+			$blnValid = false;
+		}
+
+		if (!file_exists($this->strInputFile)) {
+			$this->msg("Input file: '{$this->strInputFile}' does not exist!");
+			$blnValid = false;
+		}
+
+		if (file_exists($this->strOutputFile)) {
+			$this->msg("WARNING: Output file: '{$this->strOutputFile}' already exists!");
+
+			if (!$this->confirm('Overwrite this file?')) {
+				$blnValid = false;
+			}
+		} else if ($blnValid && $this->strOutputFile == '') {
+			$this->strOutputFile = $this->strInputFile;
+		}
+
+		return $blnValid;
+	}
+
+	private function confirm($strMsg = 'Are you sure?') {
+		$arrAnswers = [
+			'y',
+			'n',
+			'yes',
+			'no'
+		];
+
+		do {
+			$this->msg($strMsg);
+			echo '(y/n): ';
+			$strYesNo = trim(strtolower(fgets(STDIN)));
+		} while (!in_array($strYesNo, $arrAnswers));
+
+		return ($strYesNo == 'y' || $strYesNo == 'yes');
+	}
+
+	private function readString($strMsg = 'Enter value: ') {
+		echo $strMsg;
+
+		return trim(fgets(STDIN));
+	}
+
+	private function usage() {
+		$this->msg("Usage: {$this->strScriptName} <action (encrypt|decrypt)> <input file> [<output file>]");
+	}
+
+	private function msg($strMsg, $blnReplace = false) {
+		if ($blnReplace) {
+			echo "\r$strMsg";
+		} else {
+			echo "$strMsg\n";
+		}
+	}
+}
+
+$objCryptor = new Cryptor($argv);
