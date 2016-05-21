@@ -5,7 +5,8 @@ define('ASCII_MIN', 32);
 define('ASCII_MAX', 255);
 define('BASE64_MIN', 47);
 define('BASE64_MAX', 122);
-define('CHUNK_SIZE', 4 * (1024 * 1024));
+define('CHUNK_SIZE', 1024);
+define('STAMP_SIZE', 12);
 
 /**
  * Cryptor
@@ -20,6 +21,7 @@ class Cryptor {
 	private $strAction = '';
 	private $strInputFile = '';
 	private $strOutputFile = '';
+	private $strSignature = '';
 
 	public function __construct($arrArgs) {
 		$this->strScriptName = $arrArgs[0];
@@ -31,11 +33,7 @@ class Cryptor {
 		}
 
 		if ($this->validate()) {
-			if (file_put_contents($this->strOutputFile, $this->run())) {
-				$this->msg("\nFinished.");
-			} else {
-				$this->msg("Failed writing to file: '{$this->strOutputFile}'!");
-			}
+			$this->run();
 		} else {
 			$this->usage();
 			die();
@@ -43,72 +41,107 @@ class Cryptor {
 	}
 
 	private function run() {
-		$strFileContents = file_get_contents($this->strInputFile);
-		$strOutput = '';
-		$strKey = md5($this->readString('Enter key: '));
+		$strKey  = md5($this->readString('Enter key: '));
+		$strSign = md5(file_get_contents(__FILE__) . $strKey);
+
+		$strBuffer = '';
 		$intAltMin = BASE64_MIN - ASCII_MIN;
 		$intAltMax = ASCII_MAX - (BASE64_MAX - ASCII_MIN);
 
+		$srmInFile   = fopen($this->strInputFile, 'r');
+		$srmOutFile  = fopen($this->strOutputFile, 'w');
+		$intFileSize = filesize($this->strInputFile) > 0 ? filesize($this->strInputFile) : 1;
+		$intNumChunk = ceil($intFileSize / CHUNK_SIZE);
+		$intPosition = 0;
+
 		switch ($this->strAction) {
 			case 'encrypt':
-				$arrFileContents = str_split(base64_encode($strFileContents));
-				$intTotalContents = count($arrFileContents);
+				$intStamp = time();
+				$intStamp = substr((microtime(true) * 10000), (-1 * STAMP_SIZE));
 
-				foreach ($arrFileContents as $intIndex => $strChar) {
-					$intChar = ord($strChar);
-					$intChar -= $intAltMin;
+				fwrite($srmOutFile, $strSign);
+				fwrite($srmOutFile, $intStamp);
 
-					foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
-						$intKeyChar = ord($strKeyChar);
-						$intMod = $intKeyChar % $intAltMax;
-						$intChar += $intMod;
-						$intChar -= ($intKeyIndex % $intMod);
+				while (!feof($srmInFile)) {
+					$strOutput = '';
+					$strBuffer = fread($srmInFile, CHUNK_SIZE);
 
-						if ($intKeyIndex % 2 == 0) {
-							$intChar -= ($intIndex % $intMod);
-						} else {
-							$intChar += ($intIndex % $intMod);
+					foreach (str_split(base64_encode($strBuffer)) as $intIndex => $strChar) {
+						$intChar = ord($strChar);
+						$intChar -= $intAltMin;
+
+						foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+							$intKeyChar = ord($strKeyChar);
+							$intMod = ($intStamp + $intKeyChar) % $intAltMax;
+							$intChar += $intMod;
+							$intChar -= ($intKeyIndex % $intMod);
+
+							if ($intKeyIndex % 2 == 0) {
+								$intChar -= ($intStamp + $intIndex) % $intMod;
+							} else {
+								$intChar += ($intStamp + $intIndex) % $intMod;
+							}
 						}
+
+						$strOutput .= chr($intChar);
 					}
 
-					$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
-					$this->msg("Encrypting [$intPercent%]", true);
+					fwrite($srmOutFile, $strOutput);
 
-					$strOutput .= chr($intChar);
+					$intPosition++;
+					$intPercent = round( ( $intPosition / $intNumChunk ) * 100, 0 );
+					$this->msg("Encrypting [$intPercent%]", true);
 				}
+
+				fclose($srmOutFile);
+				fclose($srmInFile);
+
 				break;
 			case 'decrypt':
-				$arrFileContents = str_split($strFileContents);
-				$intTotalContents = count($arrFileContents);
+				if (fread($srmInFile, strlen($strSign)) != $strSign) {
+					$this->msg("Invalid signature!");
+				} else {
+					$intStamp = fread($srmInFile, STAMP_SIZE);
 
-				foreach ($arrFileContents as $intIndex => $strChar) {
-					$intChar = ord($strChar);
-					$intChar += $intAltMin;
+					while (!feof($srmInFile)) {
+						$strOutput = '';
+						$strBuffer = fread($srmInFile, CHUNK_SIZE);
 
-					foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
-						$intKeyChar = ord($strKeyChar);
-						$intMod = $intKeyChar % $intAltMax;
-						$intChar -= $intMod;
-						$intChar += ($intKeyIndex % $intMod);
+						foreach (str_split($strBuffer) as $intIndex => $strChar) {
+							$intChar = ord($strChar);
+							$intChar += $intAltMin;
 
-						if ($intKeyIndex % 2 == 0) {
-							$intChar += ($intIndex % $intMod);
-						} else {
-							$intChar -= ($intIndex % $intMod);
+							foreach (str_split($strKey) as $intKeyIndex => $strKeyChar) {
+								$intKeyChar = ord($strKeyChar);
+								$intMod = ($intStamp + $intKeyChar) % $intAltMax;
+								$intChar -= $intMod;
+								$intChar += ($intKeyIndex % $intMod);
+
+								if ($intKeyIndex % 2 == 0) {
+									$intChar += ($intStamp + $intIndex) % $intMod;
+								} else {
+									$intChar -= ($intStamp + $intIndex) % $intMod;
+								}
+							}
+
+							$strOutput .= chr($intChar);
 						}
+
+						fwrite($srmOutFile, base64_decode($strOutput));
+
+						$intPosition++;
+						$intPercent = round( ( $intPosition / $intNumChunk ) * 100, 0 );
+						$this->msg("Decrypting [$intPercent%]", true);
 					}
-
-					$intPercent = round( ( ($intIndex+1) / $intTotalContents ) * 100, 0 );
-					$this->msg("Decrypting [$intPercent%]", true);
-
-					$strOutput .= chr($intChar);
 				}
 
-				$strOutput = base64_decode($strOutput);
+				fclose($srmOutFile);
+				fclose($srmInFile);
+
 				break;
 		}
 
-		return $strOutput;
+		echo PHP_EOL;
 	}
 
 	// private function run() {
@@ -192,33 +225,34 @@ class Cryptor {
 	}
 
 	private function validate() {
-		$blnValid = true;
-
 		if (isset($this->arrActions[$this->strAction])) {
 			$this->strAction = $this->arrActions[$this->strAction];
 		}
 
 		if (!in_array($this->strAction, $this->arrActions)) {
 			$this->msg("Invalid <action>: '{$this->strAction}'!");
-			$blnValid = false;
+			return false;
 		}
 
 		if (!file_exists($this->strInputFile)) {
 			$this->msg("Input file: '{$this->strInputFile}' does not exist!");
-			$blnValid = false;
+			return false;
+		}
+
+		if ($this->strOutputFile == '') {
+			$this->strOutputFile = $this->strInputFile . '.' . $this->strAction . 'ed';
+			$this->msg("NOTICE: No output file specified. Saving to file: '{$this->strOutputFile}'");
 		}
 
 		if (file_exists($this->strOutputFile)) {
 			$this->msg("WARNING: Output file: '{$this->strOutputFile}' already exists!");
 
 			if (!$this->confirm('Overwrite this file?')) {
-				$blnValid = false;
+				return false;
 			}
-		} else if ($blnValid && $this->strOutputFile == '') {
-			$this->strOutputFile = $this->strInputFile;
 		}
 
-		return $blnValid;
+		return true;
 	}
 
 	private function confirm($strMsg = 'Are you sure?') {
