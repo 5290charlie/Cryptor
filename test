@@ -1,0 +1,51 @@
+#!/usr/bin/php
+<?php
+
+$strBaseDir = dirname(__FILE__);
+
+require $strBaseDir . '/lib/Cryptor.inc';
+
+$objCryptor = new Cryptor();
+$objCryptor->blnForce = true;
+$strFilesDir = $strBaseDir . '/files';
+$strEncryptDir = $strBaseDir . '/enc';
+$strDecryptDir = $strBaseDir . '/dec';
+
+if (!is_dir($strEncryptDir)) {
+  mkdir($strEncryptDir);
+}
+
+if (!is_dir($strDecryptDir)) {
+  mkdir($strDecryptDir);
+}
+
+foreach (scandir($strFilesDir) as $strFile) {
+  if (substr($strFile, 0, 1) != '.') {
+    $strKey = md5($strFile . microtime(true));
+    $strFilePath = $strFilesDir . '/' . $strFile;
+    $strEncryptPath = $strEncryptDir . '/' . $strFile;
+    $strDecryptPath = $strDecryptDir . '/' . $strFile;
+
+    $objCryptor->run([
+      'cryptor',
+      'encrypt',
+      $strFilePath,
+      $strEncryptPath,
+      $strKey
+    ]);
+
+    $objCryptor->run([
+      'cryptor',
+      'decrypt',
+      $strEncryptPath,
+      $strDecryptPath,
+      $strKey
+    ]);
+
+    if (md5(file_get_contents($strFilePath)) != md5(file_get_contents($strDecryptPath))) {
+      echo "*** FAILED: Cryptor failed for file: '$strFile'\n";
+    } else {
+      echo "SUCCESS: Verified: '$strFile'\n";
+    }
+  }
+}
