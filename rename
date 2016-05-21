@@ -1,0 +1,14 @@
+#!/usr/bin/php
+<?php
+
+$strFilesDir = 'files';
+
+foreach (scandir($strFilesDir) as $strFile) {
+  if (substr($strFile, 0, 1) != '.') {
+    $strFilePath = $strFilesDir . '/' . $strFile;
+    $arrInfo = pathinfo($strFilePath);
+    $strExt = $arrInfo['extension'];
+
+    rename($strFilePath, $strFilesDir . '/' . md5($strFile) . '.' . $strExt);
+  }
+}
