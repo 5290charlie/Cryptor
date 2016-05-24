@@ -8,44 +8,142 @@ require $strBaseDir . '/lib/Cryptor.inc';
 $objCryptor = new Cryptor();
 $objCryptor->blnForce = true;
 $strFilesDir = $strBaseDir . '/files';
-$strEncryptDir = $strBaseDir . '/enc';
-$strDecryptDir = $strBaseDir . '/dec';
+$intTotalFailures = $intTotalRepeats = 0;
 
-if (!is_dir($strEncryptDir)) {
-  mkdir($strEncryptDir);
+if (isset($argv[1]) && is_numeric($argv[1]) && $argv[1] >= 1) {
+  $intNumTests = $argv[1];
+} else {
+  $intNumTests = 1;
 }
 
-if (!is_dir($strDecryptDir)) {
-  mkdir($strDecryptDir);
-}
+$arrExecute = [
+  'verify',
+  // 'confirm',
+];
 
-foreach (scandir($strFilesDir) as $strFile) {
-  if (substr($strFile, 0, 1) != '.') {
-    $strKey = md5($strFile . microtime(true));
-    $strFilePath = $strFilesDir . '/' . $strFile;
-    $strEncryptPath = $strEncryptDir . '/' . $strFile;
-    $strDecryptPath = $strDecryptDir . '/' . $strFile;
+if (in_array('verify', $arrExecute)) {
+  for ($intCurrentTest = 1; $intCurrentTest <= $intNumTests; $intCurrentTest++) {
+    echo "\n\n--> Beginning Verification #$intCurrentTest (of $intNumTests)\n";
 
-    $objCryptor->run([
-      'cryptor',
-      'encrypt',
-      $strFilePath,
-      $strEncryptPath,
-      $strKey
-    ]);
+    $strEncryptDir = $strBaseDir . '/enc-' . $intCurrentTest;
+    $strDecryptDir = $strBaseDir . '/dec-' . $intCurrentTest;
 
-    $objCryptor->run([
-      'cryptor',
-      'decrypt',
-      $strEncryptPath,
-      $strDecryptPath,
-      $strKey
-    ]);
-
-    if (md5(file_get_contents($strFilePath)) != md5(file_get_contents($strDecryptPath))) {
-      echo "*** FAILED: Cryptor failed for file: '$strFile'\n";
-    } else {
-      echo "SUCCESS: Verified: '$strFile'\n";
+    if (!is_dir($strFilesDir)) {
+      mkdir($strFilesDir);
     }
+
+    if (!is_dir($strEncryptDir)) {
+      mkdir($strEncryptDir);
+    }
+
+    if (!is_dir($strDecryptDir)) {
+      mkdir($strDecryptDir);
+    }
+
+    $intFailures = 0;
+
+    foreach (scandir($strFilesDir) as $strFile) {
+      if (substr($strFile, 0, 1) != '.') {
+        echo "Verifying file: '$strFile'\n";
+
+        $strKey = md5(mt_rand() . $strFile . microtime(true));
+        $strFilePath = $strFilesDir . '/' . $strFile;
+        $strEncryptPath = $strEncryptDir . '/' . $strFile;
+        $strDecryptPath = $strDecryptDir . '/' . $strFile;
+
+        $objCryptor->run([
+          'cryptor',
+          'encrypt',
+          $strFilePath,
+          $strEncryptPath,
+          $strKey,
+          $intCurrentTest
+        ]);
+
+        $objCryptor->run([
+          'cryptor',
+          'decrypt',
+          $strEncryptPath,
+          $strDecryptPath,
+          $strKey,
+          $intCurrentTest
+        ]);
+
+        if (md5_file($strFilePath) != md5_file($strDecryptPath)) {
+          echo "==> FAILURE: Decrypted file doesn't match original! <==\n";
+          $intFailures++;
+          $intTotalFailures++;
+        } else if (md5_file($strFilePath) == md5_file($strEncryptPath)) {
+          echo "==> FAILURE: Encrypted file hasn't changed! <==\n";
+          $intFailures++;
+          $intTotalFailures++;
+        } else {
+          echo "==> SUCCESS: Verified file integrity <==\n";
+        }
+
+        echo "|\n";
+      }
+    }
+
+    echo "$intFailures Failures\n";
   }
 }
+
+if (in_array('confirm', $arrExecute)) {
+  for ($intCurrentTest = 1; $intCurrentTest <= $intNumTests; $intCurrentTest++) {
+    echo "\n\n--> Beginning Comparison #$intCurrentTest (of $intNumTests)\n";
+
+    $strEncryptDir = $strBaseDir . '/enc-' . $intCurrentTest;
+
+    if (!is_dir($strEncryptDir)) {
+      mkdir($strEncryptDir);
+    }
+
+    $intFailures = $intRepeats = 0;
+
+    foreach (scandir($strEncryptDir) as $strFile) {
+      if (substr($strFile, 0, 1) != '.') {
+        echo "Comparing file: '$strFile'\n";
+
+        $intDuplicates = 0;
+        $strEncryptPath = $strEncryptDir . '/' . $strFile;
+
+        for ($intInnerTest = 1; $intInnerTest <= $intNumTests; $intInnerTest++) {
+          $strCompareDir = $strBaseDir . '/enc-' . $intInnerTest;
+
+          foreach (scandir($strCompareDir) as $strCompareFile) {
+            if (substr($strCompareFile, 0, 1) != '.') {
+              $strComparePath = $strCompareDir . '/' . $strCompareFile;
+
+              if (!($intInnerTest == $intCurrentTest && $strComparePath == $strEncryptPath)) {
+                if (md5_file($strEncryptPath) == md5_file($strComparePath)) {
+                  echo "==> FAILURE: Duplicate encryption found! <==\nDuplicate Files:\n\t- $strEncryptPath\n\t- $strComparePath\n";
+                  $intFailures++;
+                  $intDuplicates++;
+                  $intTotalFailures++;
+
+                  if ($strFile == $strCompareFile) {
+                    $intRepeats++;
+                    $intTotalRepeats++;
+                  } else {
+                    echo "==> FAILURE: Duplicate encryption found on different files! <==\nDuplicate Files:\n\t- $strEncryptPath\n\t- $strComparePath\n";
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if ($intDuplicates == 0) {
+          echo "==> SUCCESS: Verified encrypted file uniqueness <==\n";
+        }
+
+        echo "|\n";
+      }
+    }
+
+    echo "$intFailures Failures\n$intRepeats Repeats\n";
+  }
+}
+
+echo "\n\n$intTotalFailures Total Failures\n$intTotalRepeats Total Repeats\n\n" . str_repeat('=', 32) . PHP_EOL;

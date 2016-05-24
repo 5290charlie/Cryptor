@@ -1,7 +1,7 @@
 <?php
 
-define('ASCII_MIN', 1);
-define('ASCII_MAX', 255);
+define('ASCII_MIN', 8);
+define('ASCII_MAX', 224);
 define('BASE64_MIN', 47);
 define('BASE64_MAX', 122);
 define('CHUNK_SIZE', 1024);
@@ -24,6 +24,18 @@ class Cryptor {
 	private $strInputFile = '';
 	private $strOutputFile = '';
 	private $strSignature = '';
+  private $intTestNumber = 1;
+
+  public function __construct() {
+    $mixDebugExist = trim(`ls /tmp/debug-* | wc -l`);
+
+    if (is_numeric($mixDebugExist) && $mixDebugExist > 0) {
+      if ($this->confirm('Purge existing debug file(s)?')) {
+        $this->msg('Purging existing debug files...');
+        exec('rm /tmp/debug-*');
+      }
+    }
+  }
 
   private function init($arrArgs) {
     $this->strScriptName = $arrArgs[0];
@@ -38,10 +50,14 @@ class Cryptor {
 			$this->strKey = $arrArgs[4];
 		}
 
+    if (isset($arrArgs[5]) && is_numeric($arrArgs[5])) {
+      $this->intTestNumber = $arrArgs[5];
+    }
+
 		if (!$this->validate()) {
 			$this->usage();
 			die();
-		}
+    }
   }
 
 	public function run($arrArgs) {
@@ -55,12 +71,19 @@ class Cryptor {
 
 		$strSign = md5(file_get_contents(__FILE__) . $strKey);
 
+    $arrDebug = [];
 		$strBuffer = '';
 		$intAltMin = BASE64_MIN - ASCII_MIN;
-		$intAltMax = ASCII_MAX - (BASE64_MAX - ASCII_MIN);
+		$intAltMax = ASCII_MAX - BASE64_MAX - ASCII_MIN;
 		$srmInFile = fopen($this->strInputFile, 'r');
 
 		$intPosition = 0;
+
+    $arrDebug = [
+      'test_num' => $this->intTestNumber,
+      'alt_min' => $intAltMin,
+      'action' => $this->strAction
+    ];
 
 		switch ($this->strAction) {
 			case 'encrypt':
@@ -74,7 +97,16 @@ class Cryptor {
 
 				$strKey = md5($strKey . $intStamp);
         $intKey = $this->getKeyVal($strKey);
-        $intMod = $intKey % $intAltMax;
+        $intMod = fmod($intKey * $intStamp, $intAltMax);
+        $intMod += fmod($intStamp, ($intAltMax - $intMod));
+        $intMod += ASCII_MIN;
+
+        $arrDebug = array_merge($arrDebug, [
+          'stamp' => $intStamp,
+          'mod' => $intMod,
+          'key' => $strKey,
+          'sign' => $strSign
+        ]);
 
 				while (!feof($srmInFile)) {
 					$strOutput = '';
@@ -84,7 +116,7 @@ class Cryptor {
 						$intChar = ord($strChar);
 						$intChar -= $intAltMin;
             $intChar += $intMod;
-						$strOutput .= chr($intChar);
+            $strOutput .= chr($intChar);
 					}
 
 					$strOutput .= PHP_EOL;
@@ -112,9 +144,18 @@ class Cryptor {
 
 					$strKey = md5($strKey . $intStamp);
           $intKey = $this->getKeyVal($strKey);
-          $intMod = $intKey % $intAltMax;
+          $intMod = fmod($intKey * $intStamp, $intAltMax);
+          $intMod += fmod($intStamp, ($intAltMax - $intMod));
+          $intMod += ASCII_MIN;
 
 					$srmOutFile  = fopen($this->strOutputFile, 'w');
+
+          $arrDebug = array_merge($arrDebug, [
+            'stamp' => $intStamp,
+            'mod' => $intMod,
+            'key' => $strKey,
+            'sign' => $strSign,
+          ]);
 
 					while (!feof($srmInFile)) {
 						$strOutput = '';
@@ -145,7 +186,9 @@ class Cryptor {
 				break;
 		}
 
-		echo PHP_EOL;
+    file_put_contents('/tmp/debug-' . basename($this->strInputFile), json_encode($arrDebug, JSON_PRETTY_PRINT), FILE_APPEND);
+
+  	echo PHP_EOL;
 	}
 
 	private function getKeyVal($strKey) {
@@ -180,11 +223,13 @@ class Cryptor {
 		}
 
 		if (file_exists($this->strOutputFile)) {
-			$this->msg("WARNING: Output file: '{$this->strOutputFile}' already exists!");
+      if (!$this->blnForce) {
+        $this->msg("WARNING: Output file: '{$this->strOutputFile}' already exists!");
 
-			if (!$this->confirm('Overwrite this file?')) {
-				return false;
-			}
+        if (!$this->confirm('Overwrite this file?')) {
+          return false;
+        }
+      }
 		}
 
 		return true;

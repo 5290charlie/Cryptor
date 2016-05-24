@@ -1,0 +1,5 @@
+#!/bin/bash
+
+rm /tmp/debug-*
+rm -r enc-*
+rm -r dec-*
