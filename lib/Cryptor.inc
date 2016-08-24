@@ -76,7 +76,10 @@ class Cryptor {
 			$strKey  = md5($this->readString('Enter key: '));
 		}
 
-		$strSign = md5(file_get_contents(__FILE__) . $strKey);
+    $strFileSalt = md5(trim(file_get_contents(__FILE__)));
+    $strKeyHash = md5(trim($strKey));
+
+		$strSign = md5($strKeyHash . $strFileSalt);
 
     $arrDebug = [];
 		$strBuffer = '';
@@ -90,7 +93,10 @@ class Cryptor {
       'test_num' => $this->intTestNumber,
       'alt_min' => $intAltMin,
       'action' => $this->strAction,
-      'sign' => $strSign
+      'key' => $strKey,
+      'key_hash' => $strKeyHash,
+      'file_salt' => $strFileSalt,
+      'sign' => $strSign,
     ];
 
 		switch ($this->strAction) {
