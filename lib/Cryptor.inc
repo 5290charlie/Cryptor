@@ -12,6 +12,7 @@ define('STAMP_SIZE', 12);
  */
 class Cryptor {
   public $blnForce = false;
+  public $blnOutput = true;
 
 	private $arrActions = [
 		'e' => 'encrypt',
@@ -188,7 +189,9 @@ class Cryptor {
 
     file_put_contents('/tmp/debug-' . basename($this->strInputFile), json_encode($arrDebug, JSON_PRETTY_PRINT), FILE_APPEND);
 
-  	echo PHP_EOL;
+    if ($this->blnOutput) {
+      echo PHP_EOL;      
+    }
 	}
 
 	private function getKeyVal($strKey) {
@@ -267,10 +270,12 @@ class Cryptor {
 	}
 
 	private function msg($strMsg, $blnReplace = false) {
-		if ($blnReplace) {
-			echo "\r$strMsg";
-		} else {
-			echo "$strMsg" . PHP_EOL;
-		}
+    if ($this->blnOutput) {
+      if ($blnReplace) {
+  			echo "\r$strMsg";
+  		} else {
+  			echo "$strMsg" . PHP_EOL;
+  		}
+    }
 	}
 }
