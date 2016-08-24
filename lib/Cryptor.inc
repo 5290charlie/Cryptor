@@ -28,7 +28,11 @@ class Cryptor {
   private $intTestNumber = 1;
 
   public function __construct($blnSilent = false) {
-    if ($blnSilent !== true) {
+
+    if ($blnSilent === true) {
+      $this->blnForce = true;
+      $this->blnOutput = false;
+    } else {
       $mixDebugExist = trim(`ls /tmp/debug-* | wc -l`);
 
       if (is_numeric($mixDebugExist) && $mixDebugExist > 0) {
