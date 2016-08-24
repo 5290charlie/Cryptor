@@ -71,7 +71,7 @@ class Cryptor {
     $this->init($arrArgs);
 
 		if ($this->strKey != '') {
-			$strKey = $this->strKey;
+			$strKey = md5($this->strKey);
 		} else {
 			$strKey  = md5($this->readString('Enter key: '));
 		}
