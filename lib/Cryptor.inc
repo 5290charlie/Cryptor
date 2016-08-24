@@ -93,7 +93,7 @@ class Cryptor {
       'test_num' => $this->intTestNumber,
       'alt_min' => $intAltMin,
       'action' => $this->strAction,
-      'key' => $strKey,
+      'key_orig' => $strKey,
       'key_hash' => $strKeyHash,
       'file_salt' => $strFileSalt,
       'sign' => $strSign,
