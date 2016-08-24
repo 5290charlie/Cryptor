@@ -89,7 +89,8 @@ class Cryptor {
     $arrDebug = [
       'test_num' => $this->intTestNumber,
       'alt_min' => $intAltMin,
-      'action' => $this->strAction
+      'action' => $this->strAction,
+      'sign' => $strSign
     ];
 
 		switch ($this->strAction) {
@@ -112,7 +113,6 @@ class Cryptor {
           'stamp' => $intStamp,
           'mod' => $intMod,
           'key' => $strKey,
-          'sign' => $strSign
         ]);
 
 				while (!feof($srmInFile)) {
@@ -161,7 +161,6 @@ class Cryptor {
             'stamp' => $intStamp,
             'mod' => $intMod,
             'key' => $strKey,
-            'sign' => $strSign,
           ]);
 
 					while (!feof($srmInFile)) {
