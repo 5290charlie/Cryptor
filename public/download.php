@@ -34,13 +34,17 @@ if (isset($_POST) && isset($_POST['do']) && isset($_POST['key']) && $_POST['key'
 			$strFilename = $strAction . 'ed-' . time() . '-' . $_FILES['file']['name'];
     }
 
-		$objCryptor->run([
-			'cryptor-web',
-			$strAction,
-			$strFileTmp,
-			$arrFileRes[$strAction],
-			$strKey
-		]);
+		try {
+			$objCryptor->run([
+				'cryptor-web',
+				$strAction,
+				$strFileTmp,
+				$arrFileRes[$strAction],
+				$strKey
+			]);
+		} catch (Exception $e) {
+			die($e->getMessage());
+		}
 
 		header('Content-Description: File Transfer');
 		header('Content-Type: application/octet-stream');
