@@ -4,9 +4,7 @@ $strBaseDir = dirname(__FILE__);
 
 require $strBaseDir . '/../lib/Cryptor.inc';
 
-$objCryptor = new Cryptor();
-$objCryptor->blnForce = true;
-$objCryptor->blnOutput = false;
+$objCryptor = new Cryptor(true);
 
 if (isset($_POST) && isset($_POST['do']) && isset($_POST['key']) && $_POST['key'] != '') {
 	if ($_FILES['file']['error'] > 0) {

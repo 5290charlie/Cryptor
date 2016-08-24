@@ -27,13 +27,15 @@ class Cryptor {
 	private $strSignature = '';
   private $intTestNumber = 1;
 
-  public function __construct() {
-    $mixDebugExist = trim(`ls /tmp/debug-* | wc -l`);
+  public function __construct($blnSilent = false) {
+    if ($blnSilent !== true) {
+      $mixDebugExist = trim(`ls /tmp/debug-* | wc -l`);
 
-    if (is_numeric($mixDebugExist) && $mixDebugExist > 0) {
-      if ($this->confirm('Purge existing debug file(s)?')) {
-        $this->msg('Purging existing debug files...');
-        exec('rm /tmp/debug-*');
+      if (is_numeric($mixDebugExist) && $mixDebugExist > 0) {
+        if ($this->confirm('Purge existing debug file(s)?')) {
+          $this->msg('Purging existing debug files...');
+          exec('rm /tmp/debug-*');
+        }
       }
     }
   }
