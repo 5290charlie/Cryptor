@@ -139,7 +139,7 @@ class Cryptor {
 				$intNumLines--;
 
 				if (substr($strInfoLine, 0, strlen($strSign)) != $strSign) {
-					$this->msg("Invalid signature!");
+					$this->error("Invalid signature!");
 				} else {
 					$intStamp = substr($strInfoLine, strlen($strSign));
 
@@ -190,7 +190,7 @@ class Cryptor {
     file_put_contents('/tmp/debug-' . basename($this->strInputFile), json_encode($arrDebug, JSON_PRETTY_PRINT), FILE_APPEND);
 
     if ($this->blnOutput) {
-      echo PHP_EOL;      
+      echo PHP_EOL;
     }
 	}
 
@@ -211,12 +211,12 @@ class Cryptor {
 		}
 
 		if (!in_array($this->strAction, $this->arrActions)) {
-			$this->msg("Invalid <action>: '{$this->strAction}'!");
+			$this->error("Invalid <action>: '{$this->strAction}'!");
 			return false;
 		}
 
 		if (!file_exists($this->strInputFile)) {
-			$this->msg("Input file: '{$this->strInputFile}' does not exist!");
+			$this->error("Input file: '{$this->strInputFile}' does not exist!");
 			return false;
 		}
 
@@ -252,8 +252,7 @@ class Cryptor {
 
 		do {
 			$this->msg($strMsg);
-			echo '(y/n): ';
-			$strYesNo = trim(strtolower(fgets(STDIN)));
+      $strYesNo = strtolower($this->readString('(y/n): '));
 		} while (!in_array($strYesNo, $arrAnswers));
 
 		return ($strYesNo == 'y' || $strYesNo == 'yes');
@@ -278,4 +277,12 @@ class Cryptor {
   		}
     }
 	}
+
+  private function error($strMsg) {
+    if ($this->blnOutput) {
+      $this->msg($strMsg);
+    } else {
+      throw new Exception($strMsg);
+    }
+  }
 }
