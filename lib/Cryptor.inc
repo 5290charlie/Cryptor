@@ -6,6 +6,7 @@ define('BASE64_MIN', 47);
 define('BASE64_MAX', 122);
 define('CHUNK_SIZE', 1024);
 define('STAMP_SIZE', 12);
+define('BASE_SALT', '4MIfZufwKhBQwtQakidgSjetdTdy9dld03sZxIviZ69vzZFThTaacoDqiQYr4jE4');
 
 /**
  * Cryptor
@@ -76,10 +77,9 @@ class Cryptor {
 			$strKey  = md5($this->readString('Enter key: '));
 		}
 
-    $strFileSalt = md5(trim(file_get_contents(__FILE__)));
     $strKeyHash = md5(trim($strKey));
 
-		$strSign = md5($strKeyHash . $strFileSalt);
+		$strSign = md5($strKeyHash . BASE_SALT);
 
     $arrDebug = [];
 		$strBuffer = '';
@@ -95,7 +95,7 @@ class Cryptor {
       'action' => $this->strAction,
       'key_orig' => $strKey,
       'key_hash' => $strKeyHash,
-      'file_salt' => $strFileSalt,
+      'file_salt' => BASE_SALT,
       'sign' => $strSign,
     ];
 
